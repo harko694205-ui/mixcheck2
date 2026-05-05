@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MixCheck — AI Music Production Feedback</title>
+  <meta name="description" content="Upload your track and get instant, professional mix feedback powered by AI." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d0d0f;
+      --surface: #16161a;
+      --surface2: #1e1e24;
+      --accent: #c8f562;
+      --accent2: #7b61ff;
+      --red: #ff4d6d;
+      --amber: #f59e0b;
+      --text: #e8e8ea;
+      --muted: #6b6b7a;
+      --border: #2a2a35;
+      --mono: 'IBM Plex Mono', monospace;
+      --sans: 'DM Sans', sans-serif;
+    }
+
+    body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; }
+
+    .app { max-width: 720px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+
+    .header { margin-bottom: 2.5rem; }
+    .logo { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+    .logo-icon { width: 28px; height: 28px; background: var(--accent); border-radius: 6px; display: flex; align-items: center; justify-content: center; }
+    .logo-text { font-family: var(--mono); font-size: 15px; font-weight: 500; letter-spacing: 0.06em; color: var(--accent); }
+    .tagline { font-size: 13px; color: var(--muted); font-family: var(--mono); }
+
+    .drop-zone {
+      border: 1.5px dashed var(--border);
+      border-radius: 16px;
+      padding: 3rem 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: var(--surface);
+      position: relative;
+      margin-bottom: 1.5rem;
+    }
+    .drop-zone:hover, .drop-zone.dragging { border-color: var(--accent); background: #1a1f0f; }
+    .drop-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+    .drop-icon { margin-bottom: 12px; }
+    .drop-icon svg { width: 40px; height: 40px; stroke: var(--muted); transition: stroke 0.2s; }
+    .drop-zone:hover .drop-icon svg, .drop-zone.dragging .drop-icon svg { stroke: var(--accent); }
+    .drop-title { font-size: 16px; font-weight: 500; margin-bottom: 6px; }
+    .drop-sub { font-size: 13px; color: var(--muted); }
+
+    .file-loaded {
+      display: none;
+      align-items: center;
+      gap: 14px;
+      background: var(--surface2);
+      border: 0.5px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 18px;
+      margin-bottom: 1.5rem;
+    }
+    .file-loaded.show { display: flex; }
+    .file-icon { width: 38px; height: 38px; background: #1a1f0f; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .file-icon svg { width: 18px; height: 18px; stroke: var(--accent); }
+    .file-info { flex: 1; min-width: 0; }
+    .file-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .file-size { font-size: 12px; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
+    .remove-btn { background: none; border: none; cursor: pointer; color: var(--muted); padding: 4px; transition: color 0.15s; }
+    .remove-btn:hover { color: var(--red); }
+
+    .context-section { margin-bottom: 1.5rem; }
+    .context-label { font-size: 12px; font-family: var(--mono); color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px; }
+
+    .genre-chips, .focus-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip {
+      font-size: 12px; font-family: var(--mono);
+      padding: 5px 12px; border-radius: 20px;
+      border: 0.5px solid var(--border);
+      background: var(--surface);
+      color: var(--muted); cursor: pointer;
+      transition: all 0.15s;
+    }
+    .chip:hover { border-color: var(--accent); color: var(--accent); }
+    .chip.active { border-color: var(--accent); background: #1a1f0f; color: var(--accent); }
+
+    textarea {
+      width: 100%; background: var(--surface); border: 0.5px solid var(--border);
+      border-radius: 10px; color: var(--text); font-family: var(--sans); font-size: 14px;
+      padding: 12px 14px; resize: vertical; min-height: 80px;
+      transition: border-color 0.15s; outline: none; margin-top: 12px;
+    }
+    textarea:focus { border-color: var(--accent); }
+    textarea::placeholder { color: var(--muted); }
+
+    .analyze-btn {
+      width: 100%; padding: 16px; border-radius: 12px;
+      background: var(--accent); color: #0d0d0f;
+      border: none; cursor: pointer; font-size: 15px; font-weight: 500;
+      font-family: var(--sans); letter-spacing: 0.02em;
+      transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .analyze-btn:hover { background: #d4ff70; transform: translateY(-1px); }
+    .analyze-btn:active { transform: scale(0.99); }
+    .analyze-btn:disabled { background: var(--surface2); color: var(--muted); cursor: not-allowed; transform: none; }
+
+    .loading { display: none; align-items: center; gap: 12px; padding: 18px; background: var(--surface); border-radius: 12px; margin-top: 1.5rem; }
+    .loading.show { display: flex; }
+    .wave-bars { display: flex; align-items: center; gap: 3px; height: 24px; }
+    .wave-bar { width: 3px; background: var(--accent); border-radius: 2px; animation: wave 0.8s ease-in-out infinite; }
+    .wave-bar:nth-child(2) { animation-delay: 0.1s; }
+    .wave-bar:nth-child(3) { animation-delay: 0.2s; }
+    .wave-bar:nth-child(4) { animation-delay: 0.3s; }
+    .wave-bar:nth-child(5) { animation-delay: 0.4s; }
+    @keyframes wave { 0%, 100% { height: 6px; } 50% { height: 22px; } }
+    .loading-text { font-size: 14px; color: var(--muted); font-family: var(--mono); }
+
+    .results { display: none; margin-top: 1.5rem; }
+    .results.show { display: block; }
+    .results-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.2rem; }
+    .results-title { font-size: 13px; font-family: var(--mono); color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
+    .score-badge { font-family: var(--mono); font-size: 13px; padding: 4px 12px; border-radius: 20px; background: #1a1f0f; color: var(--accent); border: 0.5px solid var(--accent); }
+
+    .feedback-cards { display: flex; flex-direction: column; gap: 10px; }
+    .card { background: var(--surface); border: 0.5px solid var(--border); border-radius: 12px; padding: 16px 18px; border-left: 3px solid transparent; animation: fadeUp 0.3s ease forwards; opacity: 0; }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    .card.issue { border-left-color: var(--red); }
+    .card.warn { border-left-color: var(--amber); }
+    .card.good { border-left-color: var(--accent); }
+    .card.idea { border-left-color: var(--accent2); }
+
+    .card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .card-tag { font-size: 10px; font-family: var(--mono); font-weight: 500; padding: 2px 8px; border-radius: 4px; letter-spacing: 0.06em; text-transform: uppercase; }
+    .card.issue .card-tag { background: rgba(255,77,109,0.15); color: var(--red); }
+    .card.warn .card-tag { background: rgba(245,158,11,0.15); color: var(--amber); }
+    .card.good .card-tag { background: rgba(200,245,98,0.12); color: var(--accent); }
+    .card.idea .card-tag { background: rgba(123,97,255,0.15); color: var(--accent2); }
+    .card-element { font-size: 13px; font-family: var(--mono); color: var(--muted); margin-left: auto; }
+    .card-text { font-size: 14px; line-height: 1.6; color: var(--text); }
+    .card-action { margin-top: 8px; font-size: 13px; color: var(--muted); font-style: italic; }
+
+    .overall-section { margin-top: 1.2rem; background: var(--surface2); border-radius: 12px; padding: 18px; border: 0.5px solid var(--border); animation: fadeUp 0.4s ease forwards; opacity: 0; animation-delay: 0.3s; }
+    .overall-label { font-size: 11px; font-family: var(--mono); color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px; }
+    .overall-text { font-size: 14px; line-height: 1.7; color: var(--text); }
+
+    .try-again-btn { margin-top: 1.5rem; width: 100%; padding: 12px; background: none; border: 0.5px solid var(--border); border-radius: 10px; color: var(--muted); cursor: pointer; font-size: 14px; font-family: var(--sans); transition: all 0.15s; }
+    .try-again-btn:hover { border-color: var(--text); color: var(--text); }
+
+    .error-box { display: none; margin-top: 1.5rem; background: rgba(255,77,109,0.08); border: 0.5px solid rgba(255,77,109,0.3); border-radius: 10px; padding: 14px 16px; font-size: 13px; color: var(--red); font-family: var(--mono); }
+    .error-box.show { display: block; }
+
+    @media (max-width: 480px) {
+      .app { padding: 1.5rem 1rem 3rem; }
+      .drop-zone { padding: 2rem 1rem; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="logo">
+      <div class="logo-icon">
+        <svg viewBox="0 0 16 16" fill="none" width="16" height="16">
+          <path d="M2 8a6 6 0 1 0 12 0A6 6 0 0 0 2 8z" fill="#0d0d0f"/>
+          <path d="M6 6v4M8 5v6M10 7v2" stroke="#0d0d0f" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <span class="logo-text">MIXCHECK</span>
+    </div>
+    <p class="tagline">ai-powered mix feedback for producers</p>
+  </div>
+
+  <div class="drop-zone" id="dropZone">
+    <input type="file" id="fileInput" accept="audio/*" />
+    <div class="drop-icon">
+      <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M20 26V14M20 14l-5 5M20 14l5 5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M10 30h20" stroke-width="2" stroke-linecap="round"/>
+        <rect x="4" y="4" width="32" height="32" rx="8" stroke-width="1.5"/>
+      </svg>
+    </div>
+    <div class="drop-title">Drop your track here</div>
+    <div class="drop-sub">MP3, WAV, AIFF, FLAC — up to 25MB</div>
+  </div>
+
+  <div class="file-loaded" id="fileLoaded">
+    <div class="file-icon">
+      <svg viewBox="0 0 18 18" fill="none" width="18" height="18">
+        <path d="M3 3h9l3 3v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" stroke-width="1.2" stroke-linecap="round"/>
+        <path d="M7 9.5a1.5 1.5 0 1 0 3 0V7.5a.5.5 0 0 0-1 0V9" stroke-width="1.2" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div class="file-info">
+      <div class="file-name" id="fileName">track.mp3</div>
+      <div class="file-size" id="fileSize">—</div>
+    </div>
+    <button class="remove-btn" id="removeBtn" title="Remove file">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+    </button>
+  </div>
+
+  <div class="context-section">
+    <div class="context-label">Genre</div>
+    <div class="genre-chips" id="genreChips">
+      <div class="chip" data-value="Hip-Hop / Trap">Hip-Hop / Trap</div>
+      <div class="chip" data-value="House / EDM">House / EDM</div>
+      <div class="chip" data-value="Pop">Pop</div>
+      <div class="chip" data-value="R&B / Soul">R&B / Soul</div>
+      <div class="chip" data-value="Rock / Metal">Rock / Metal</div>
+      <div class="chip" data-value="Lo-fi">Lo-fi</div>
+      <div class="chip" data-value="Afrobeats">Afrobeats</div>
+      <div class="chip" data-value="Other">Other</div>
+    </div>
+
+    <div class="context-label" style="margin-top: 14px;">Focus areas</div>
+    <div class="focus-chips" id="focusChips">
+      <div class="chip" data-value="Mix levels">Mix levels</div>
+      <div class="chip" data-value="Arrangement">Arrangement</div>
+      <div class="chip" data-value="EQ / Frequencies">EQ</div>
+      <div class="chip" data-value="Dynamics / Compression">Dynamics</div>
+      <div class="chip" data-value="Stereo width">Stereo width</div>
+      <div class="chip" data-value="Vibe / Emotion">Vibe</div>
+      <div class="chip" data-value="Melody / Harmony">Melody</div>
+    </div>
+
+    <textarea id="extraNotes" placeholder="Any context? (e.g. 'This is for a film score', 'The kick feels weak to me')"></textarea>
+  </div>
+
+  <button class="analyze-btn" id="analyzeBtn" disabled>
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <path d="M9 2v2M9 14v2M2 9h2M14 9h2M4.22 4.22l1.42 1.42M12.36 12.36l1.42 1.42M4.22 13.78l1.42-1.42M12.36 5.64l1.42-1.42" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    </svg>
+    Analyze my track
+  </button>
+
+  <div class="loading" id="loading">
+    <div class="wave-bars">
+      <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+      <div class="wave-bar"></div><div class="wave-bar"></div>
+    </div>
+    <span class="loading-text" id="loadingText">Analyzing your track...</span>
+  </div>
+
+  <div class="error-box" id="errorBox"></div>
+
+  <div class="results" id="results">
+    <div class="results-header">
+      <span class="results-title">Feedback</span>
+      <span class="score-badge" id="scoreBadge">Score: —</span>
+    </div>
+    <div class="feedback-cards" id="feedbackCards"></div>
+    <div class="overall-section" id="overallSection">
+      <div class="overall-label">Overall</div>
+      <div class="overall-text" id="overallText"></div>
+    </div>
+    <button class="try-again-btn" id="tryAgainBtn">Analyze another track</button>
+  </div>
+</div>
+
+<script>
+  const dropZone = document.getElementById('dropZone');
+  const fileInput = document.getElementById('fileInput');
+  const fileLoaded = document.getElementById('fileLoaded');
+  const fileName = document.getElementById('fileName');
+  const fileSize = document.getElementById('fileSize');
+  const removeBtn = document.getElementById('removeBtn');
+  const analyzeBtn = document.getElementById('analyzeBtn');
+  const loading = document.getElementById('loading');
+  const loadingText = document.getElementById('loadingText');
+  const results = document.getElementById('results');
+  const feedbackCards = document.getElementById('feedbackCards');
+  const overallText = document.getElementById('overallText');
+  const scoreBadge = document.getElementById('scoreBadge');
+  const errorBox = document.getElementById('errorBox');
+  const tryAgainBtn = document.getElementById('tryAgainBtn');
+
+  let currentFile = null;
+
+  function formatBytes(b) {
+    if (b < 1024) return b + ' B';
+    if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+    return (b / 1048576).toFixed(1) + ' MB';
+  }
+
+  function setFile(file) {
+    currentFile = file;
+    fileName.textContent = file.name;
+    fileSize.textContent = formatBytes(file.size);
+    dropZone.style.display = 'none';
+    fileLoaded.classList.add('show');
+    analyzeBtn.disabled = false;
+  }
+
+  function clearFile() {
+    currentFile = null;
+    fileInput.value = '';
+    dropZone.style.display = '';
+    fileLoaded.classList.remove('show');
+    analyzeBtn.disabled = true;
+  }
+
+  fileInput.addEventListener('change', e => { if (e.target.files[0]) setFile(e.target.files[0]); });
+  removeBtn.addEventListener('click', clearFile);
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragging'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragging'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault(); dropZone.classList.remove('dragging');
+    const f = e.dataTransfer.files[0];
+    if (f && f.type.startsWith('audio/')) setFile(f);
+  });
+
+  document.querySelectorAll('#genreChips .chip').forEach(c => {
+    c.addEventListener('click', () => {
+      document.querySelectorAll('#genreChips .chip').forEach(x => x.classList.remove('active'));
+      c.classList.toggle('active');
+    });
+  });
+  document.querySelectorAll('#focusChips .chip').forEach(c => {
+    c.addEventListener('click', () => c.classList.toggle('active'));
+  });
+
+  tryAgainBtn.addEventListener('click', () => {
+    clearFile();
+    results.classList.remove('show');
+    errorBox.classList.remove('show');
+    document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    document.getElementById('extraNotes').value = '';
+  });
+
+  function getChipValues(id) {
+    return [...document.querySelectorAll(`#${id} .chip.active`)].map(c => c.dataset.value);
+  }
+
+  function cardType(severity) {
+    const s = (severity || '').toLowerCase();
+    if (['issue','problem','critical'].includes(s)) return 'issue';
+    if (['warning','warn','caution'].includes(s)) return 'warn';
+    if (['good','strength','positive'].includes(s)) return 'good';
+    return 'idea';
+  }
+
+  function tagLabel(type) {
+    return { issue: 'Issue', warn: 'Warning', good: 'Strength', idea: 'Suggestion' }[type] || 'Note';
+  }
+
+  function renderResults(data) {
+    feedbackCards.innerHTML = '';
+    (data.feedback || []).forEach((item, i) => {
+      const type = cardType(item.severity || item.type);
+      const card = document.createElement('div');
+      card.className = `card ${type}`;
+      card.style.animationDelay = `${i * 0.07}s`;
+      card.innerHTML = `
+        <div class="card-header">
+          <span class="card-tag">${tagLabel(type)}</span>
+          <span class="card-element">${item.element || ''}</span>
+        </div>
+        <div class="card-text">${item.feedback}</div>
+        ${item.action ? `<div class="card-action">→ ${item.action}</div>` : ''}
+      `;
+      feedbackCards.appendChild(card);
+    });
+    overallText.textContent = data.overall || '';
+    if (data.score) scoreBadge.textContent = `Score: ${data.score}/10`;
+    results.classList.add('show');
+  }
+
+  const loadingPhrases = ['Analyzing your track...','Checking the mix...','Reading the waveform...','Evaluating the arrangement...','Almost done...'];
+  let loadingInterval = null;
+
+  analyzeBtn.addEventListener('click', async () => {
+    if (!currentFile) return;
+
+    const genre = getChipValues('genreChips').join(', ');
+    const focuses = getChipValues('focusChips').join(', ');
+    const notes = document.getElementById('extraNotes').value.trim();
+
+    errorBox.classList.remove('show');
+    results.classList.remove('show');
+    loading.classList.add('show');
+    analyzeBtn.disabled = true;
+
+    let phraseIdx = 0;
+    loadingInterval = setInterval(() => {
+      phraseIdx = (phraseIdx + 1) % loadingPhrases.length;
+      loadingText.textContent = loadingPhrases[phraseIdx];
+    }, 2000);
+
+    try {
+      const base64 = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result.split(',')[1]);
+        r.onerror = () => rej(new Error('Read failed'));
+        r.readAsDataURL(currentFile);
+      });
+
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          audioBase64: base64,
+          mediaType: currentFile.type || 'audio/mpeg',
+          genre, focuses, notes
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Server error');
+
+      clearInterval(loadingInterval);
+      loading.classList.remove('show');
+      analyzeBtn.disabled = false;
+      renderResults(data);
+    } catch (err) {
+      clearInterval(loadingInterval);
+      loading.classList.remove('show');
+      analyzeBtn.disabled = false;
+      errorBox.textContent = `Error: ${err.message}`;
+      errorBox.classList.add('show');
+    }
+  });
+</script>
+</body>
+</html>
