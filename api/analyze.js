@@ -9,8 +9,8 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'No audio file provided' });
   }
 
-  const systemPrompt = `You are an expert music producer and mixing engineer with 20+ years of experience across all genres.
-Analyze audio files for mix quality, arrangement, balance, dynamics, frequency issues, and production suggestions.
+  let prompt = `You are an expert music producer and mixing engineer with 20+ years of experience across all genres.
+Analyze this audio file for mix quality, arrangement, balance, dynamics, frequency issues, and production suggestions.
 
 Respond ONLY with a valid JSON object — no markdown, no backticks, no preamble. Format:
 {
@@ -23,47 +23,47 @@ Respond ONLY with a valid JSON object — no markdown, no backticks, no preamble
       "action": "<concrete next step, or null>"
     }
   ],
-  "overall": "<2-3 sentence overall summary of the track's strengths and main improvements needed>"
+  "overall": "<2-3 sentence overall summary of the track strengths and main improvements needed>"
 }
 Provide 4-7 feedback items. Be specific, technical, and genuinely helpful.`;
 
-  let userContent = `Please analyze this audio file and give me professional music production feedback.`;
-  if (genre) userContent += `\nGenre: ${genre}`;
-  if (focuses) userContent += `\nFocus areas: ${focuses}`;
-  if (notes) userContent += `\nProducer notes: ${notes}`;
+  if (genre) prompt += `\nGenre: ${genre}`;
+  if (focuses) prompt += `\nFocus areas: ${focuses}`;
+  if (notes) prompt += `\nProducer notes: ${notes}`;
 
   try {
-    const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        system: systemPrompt,
-        messages: [{
-          role: 'user',
-          content: [
-            {
-              type: 'document',
-              source: { type: 'base64', media_type: mediaType, data: audioBase64 }
-            },
-            { type: 'text', text: userContent }
-          ]
-        }]
-      })
-    });
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              {
+                inline_data: {
+                  mime_type: mediaType,
+                  data: audioBase64
+                }
+              },
+              { text: prompt }
+            ]
+          }],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 1000,
+          }
+        })
+      }
+    );
 
-    const result = await anthropicRes.json();
+    const result = await response.json();
 
     if (result.error) {
       return res.status(500).json({ error: result.error.message });
     }
 
-    const raw = (result.content || []).map(b => b.text || '').join('');
+    const raw = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
     const cleaned = raw.replace(/```json|```/g, '').trim();
     const parsed = JSON.parse(cleaned);
 
