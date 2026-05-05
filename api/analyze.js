@@ -25,7 +25,7 @@ Respond ONLY with a valid JSON object — no markdown, no backticks, no preamble
   ],
   "overall": "<2-3 sentence overall summary of the track's strengths and main improvements needed>"
 }
-Provide 4-7 feedback items. Be specific, technical, and genuinely helpful. Mention specific frequency ranges, dB levels, timing issues, or instruments when relevant.`;
+Provide 4-7 feedback items. Be specific, technical, and genuinely helpful.`;
 
   let userContent = `Please analyze this audio file and give me professional music production feedback.`;
   if (genre) userContent += `\nGenre: ${genre}`;
@@ -76,7 +76,7 @@ Provide 4-7 feedback items. Be specific, technical, and genuinely helpful. Menti
 export const config = {
   api: {
     bodyParser: {
-      sizeLimit: '30mb',
+      sizeLimit: '50mb',
     },
   },
 };
